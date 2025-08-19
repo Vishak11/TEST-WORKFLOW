@@ -1,14 +1,39 @@
-console.log("data)
-var username = "admin";
 
-password = "12345";  
+var user = "admin"
 
-var apiKey = "abcd-efgh-ijkl";
+password = 12345  
 
-function getdata(){
-return fetch("http://example.com/api/data").then(r=>r.json()).then(result=>{
-console.log(result)
-}).catch(e=>{});
+var API_KEY = "hardcoded-secret-key"
+
+function getdata( ){
+    return fetch("http://example.com/api/data") 
+    .then(r=>r.json())
+    .then(x=>{
+      console.log("Success!", x)
+      return "ok" // useless return
+    })
+    .catch(err=>{ console.log() }) 
 }
 
-getdata()
+alert("Fetching data...")
+
+document.body.innerHTML = "<h1>Loading...</h1>"
+
+// Adding unused variables
+var temp = 999
+var notUsed = "blah blah"
+
+setTimeout(function() {
+  setTimeout(function() {
+    setTimeout(function() {
+      console.log("Deep nested callbacks 🤦")
+    }, 1000)
+  }, 1000)
+}, 1000)
+
+if (password == "12345") {
+    console.log("Weak password accepted!")  // insecure
+}
+
+var count = "10"
+console.log(count + 1) // prints "101", not 11
