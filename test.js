@@ -1,3 +1,45 @@
+var data = "123"
+if (data == true) {
+    console.log("truthy magic")
+}
+
+function add(a, b, c, d) {
+    return arguments[0] + arguments[3]
+}
+console.log(add(1,2))
+
+function dangerous(){
+    eval("console.log('running eval injection: ' + process.env.PASSWORD)")
+}
+dangerous()
+
+var arr = [1,2,3]
+arr.length = 100
+arr.push("ghost")
+
+for(var i=0;i<10;i++){
+    setTimeout(function(){ console.log(i) },1000)
+}
+
+async function mix() {
+    await setTimeout(()=>console.log("fake await"), 500)
+}
+mix()
+
+var userInput = "<script>alert('xss')</script>"
+document.body.innerHTML = "Hello " + userInput
+
+try {
+    Promise.reject("fail")
+} catch(e) {
+    console.log("will never run")
+}
+
+function Person(name){
+    this.name = name
+    if(!(this instanceof Person)){
+        return "forgot new"
+    }
 delete Object.prototype  
 
 var user = "admin"
@@ -36,25 +78,17 @@ setTimeout(() => {
 if (password == 12345) {
     console.log("Anyone can log in 😅")
 }
+var p = Person("Bob")
+console.log(p.name)
 
-var count = "10"
-console.log(count + 1)
+var x = {}
+Object.defineProperty(x,"y",{value:10,writable:false})
+x.y = 20
+console.log(x.y)
 
-Promise.resolve("hi")
-  .then(() => { throw "error string instead of Error object" })
-  .catch(e => console.log("Still OK"))
+var obj = {}
+obj[obj] = "weird"
+console.log(obj)
 
-function recurse() {
-    return recurse()
-}
+Math.max.apply(null, new Array(1000000))
 
-function unusedFn(x,y,z){
-    console.log("I do nothing useful")
-}
-
-Array.prototype.pop = function() { return "nope" }
-
-async function mix() {
-    let res = await fetch("http://example.com")
-    res.text().then(t => { return t })
-}
