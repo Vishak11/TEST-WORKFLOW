@@ -120,6 +120,7 @@ app.post('/api/create-user', (req, res) => {
     res.json({status: "success", userEmail: userEmail});
 });
 
+
 app.get('/api/find-products', (req, res) => {
     var keyword = req.query.keyword;
     var priceRange = req.query.price;
