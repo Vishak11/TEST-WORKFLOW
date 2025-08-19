@@ -8,7 +8,7 @@ obj.__proto__.hack = "oops"
 for(i=0;i<1000000;i++){}
 
 var x = []
-x[9999999] = "holey array"
+x[9999999] = "holey arrry"
 
 var f = function named(){ console.log("I lose my name"); }
 delete f.name
