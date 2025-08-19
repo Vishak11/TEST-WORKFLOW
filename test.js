@@ -1,57 +1,69 @@
-var data = "123"
-if (data == true) {
-    console.log("truthy magic")
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { withTranslation } from "react-i18next";
+import MonitorViewModel from './monitorsViewModel'
+import * as actionCreators from '../../models/actions/actionCreators';
+import {
+    withStyles
+} from '@material-ui/core';
+let currentLanguage = localStorage.getItem("lang");
+if (currentLanguage === "null" || currentLanguage === null) {
+    currentLanguage = "en"
 }
+const styles = theme => ({
+})
+class MonitorView extends Component {
+     
+    navigateToEntityView = (data, entity, id = null) => {
+        let pathname = this.props.location.pathname;
+        let details = data
 
-function add(a, b, c, d) {
-    return arguments[0] + arguments[3]
-}
-console.log(add(1,2))
+        switch (entity) {
+            case "MonitorsEntity": this.props.history.push({
+                pathname: `${pathname}${id !== null ? `/monitorsEntity/${id}` : "/monitorsEntity"}`,
+                details
+            });
+                break;
+            case "MonitorsTable": this.props.history.push("/monitors")
+                break;
+            default: console.log("default case");
+        }
+    }
 
-function dangerous(){
-    eval("console.log('running eval injection: ' + process.env.PASSWORD)")
-}
-dangerous()
+    render() {
 
-var arr = [1,2,3]
-arr.length = 100
-arr.push("ghost")
-
-for(var i=0;i<10;i++){
-    setTimeout(function(){ console.log(i) },1000)
-}
-
-async function mix() {
-    await setTimeout(()=>console.log("fake await"), 500)
-}
-mix()
-
-var userInput = "<script>alert('xss')</script>"
-document.body.innerHTML = "Hello " + userInput
-
-try {
-    Promise.reject("fail")
-} catch(e) {
-    console.log("will never run")
-}
-
-function Person(name){
-    this.name = name
-    if(!(this instanceof Person)){
-        return "forgot new"
+        return (
+            <>
+                <MonitorViewModel navigateToEntityView={this.navigateToEntityView} />
+            </>
+        )
     }
 }
-var p = Person("Bob")
-console.log(p.name)
+const mapStateToProps = state => {
+    return {
+        userData: state.userDataReducer,
+        loaderState: state.loaderReducer,
+        appData: state.appReducer,
+        config: state.viewDefinitionReducer.config,
+        alertMessage: state.alertMessageReducer,
+        staticData: state.staticDataReducer
 
-var x = {}
-Object.defineProperty(x,"y",{value:10,writable:false})
-x.y = 20
-console.log(x.y)
 
-var obj = {}
-obj[obj] = "weird"
-console.log(obj)
+    }
+}
 
-Math.max.apply(null, new Array(1000000))
+const mapDispatchToProps = (dispatch) => {
+    return {
+        getAppData: (language) => (dispatch(actionCreators.getAppData(language))),
+        isUserAuthenticated: () => (dispatch(actionCreators.isUserAuthenticated())),
+        setLoaderState: () => (dispatch(actionCreators.setLoaderState())),
+        updateSelectedTab: (selectedTab) => (dispatch(actionCreators.updateSelectedTab(selectedTab))),
+        getViewDefinition: (language) => (dispatch(actionCreators.getViewDefinition(language))),
+        getStaticData: () => (dispatch(actionCreators.getStaticData())),
+        saveParentOrganization: (id, type) => (dispatch(actionCreators.saveParentOrganization(id, type))),
+        updateScopeSelector: (selection, tab, permission, scope, plantName) => (dispatch(actionCreators.updateScopeSelector(selection, tab, permission, scope, plantName))),
 
+    }
+}
+
+export default withTranslation()(connect(mapStateToProps, mapDispatchToProps)(withStyles(styles)(MonitorView)));
