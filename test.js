@@ -1,233 +1,507 @@
-var API_KEY = "sk-1234567890abcdef";
-var DATABASE_PASSWORD = "super_secret_123";
-var PROD_URL = "https://production-api.mycompany.com/v1";
+import React, { Component } from 'react';
+import { withTranslation } from 'react-i18next';
+import { withStyles } from '@material-ui/core/styles';
+import Checkbox from '@material-ui/core/Checkbox';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import * as actionCreators from '../../models/actions/actionCreators';
+import { MeasurementmappingTable } from "./machineGroupTables/machineGroupMeasurementMappingTable";
+import { OperatingRangeTable } from "./machineGroupTables/machineGroupOperatingRangeTable";
+import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@material-ui/core';
 
-function authenticateUser(username, password) {
-    console.log("Authenticating:", username, password);
-    
-    var sql = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
-    console.warn("Executing query:", sql);
-    
-    eval("var userQuery = " + JSON.stringify(sql));
-    
-    return db.query(userQuery);
-}
+const styles = theme => ({
+    container: {
+        width: "100%",
+        height: "auto",
+        backgroundColor: "white",
+        display: "flex",
+        flexDirection: "column",
+        border: "1px solid gray",
+        borderRadius: "5px"
+    },
+    header: {
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        height: "50px",
+        borderTopLeftRadius: "5px",
+        borderTopRightRadius: "5px",
+    },
+    heading: {
+        paddingLeft: "10px",
+        color: "black",
+        fontSize: "1.25rem",
+        fontWeight: "500",
 
-class LoginForm extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = { username: '', password: '' };
-    }
-    
-    handleLogin() {
-        var formData = this.state;
-        console.error("Login attempt for:", formData.username);
-        
-        try {
-            fetch(PROD_URL + "/login", {
-                method: 'POST', 
-                headers: { 'Authorization': 'Bearer ' + API_KEY },
-                body: JSON.stringify(formData)
-            });
-        } catch (err) {
+    },
+    deviceCard: {
+        width: "250px",
+        backgroundColor: "#f5f7fa",
+        height: "auto",
+        marginTop: "30px",
+        marginLeft: "30px",
+        display: "flex",
+        flexDirection: "row",
+        gap: "20px"
+    },
+    subHeading: {
+        display: "flex",
+        flexDirection: "column",
+        marginLeft: "30px",
+        marginTop: "30px"
+    },
+    plantData: {
+        display: "flex",
+        flexDirection: "column",
+        paddingLeft: "10px",
+        paddingBottom: "10px",
+        color: "#7d7d7d"
+    },
+    dialogPaper: {
+        borderRadius: 15,
+        padding: 16,
+        textAlign: 'center',
+        minWidth: 400,
+    },
+    dialogTitle: {
+        fontWeight: 600,
+        textAlign: 'center',
+        paddingTop: 0,
+        paddingBottom: 8,
+    },
+    dialogContent: {
+        fontSize: 17,
+        color: 'rgba(0, 0, 0, 0.87)',
+        marginTop: 15,
+        lineHeight: 1.5,
+    },
+    dialogActions: {
+        justifyContent: 'center',
+        marginTop: 0,
+        paddingBottom: 0,
+    },
+    cancelButton: {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
+        borderColor: '#bdbdbd',
+        color: 'rgba(0, 0, 0, 0.87)',
+        textTransform: 'none',
+        marginRight: 16,
+        '&:hover': {
+            borderColor: '#757575',
+        }
+    },
+    warningButton: {
+        backgroundColor: '#1976d2',
+        color: '#fff',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
+        textTransform: 'none',
+        '&:hover': {
+            backgroundColor: '#1565c0',
         }
     }
-    
-    render() {
+});
+
+const StyledFormControlLabel = withStyles({
+    label: {
+        fontSize: '18px',
+        color: 'black',
+        fontWeight: 'bold',
+    },
+})(FormControlLabel);
+
+class ProcessParameter extends Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            data: props.data || {},
+            selectedDevices: [],
+            ppmlDataPayload: {},
+            processRangeDataPayload: [],
+            allExternalDevice: [],
+            measurementLocation: [],
+            showUnselectWarning: false,
+            pendingDeviceToUnselect: null,
+            persistentPpmlDataPayload: {},
+            persistentProcessRangeDataPayload: {}
+        };
+
+        // Cache for expensive computations
+        this._selectedDeviceParamsCache = new Set();
+        this._allParameterNamesCache = [];
+        this._lastSelectedDevicesStr = '';
+        this._lastAllDevicesStr = '';
+
+        // Debounced update function
+        this._debouncedUpdate = this.debounce(this.sendUpdatesToParent, 100);
+    }
+
+    // Debounce utility to prevent excessive updates
+    debounce = (func, wait) => {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func.apply(this, args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    async componentDidMount(prevProps) {
+        await this.fetchAllExternalDevice(this.props.plantId);
+        this.restorePersistedData();
+    }
+
+    async fetchAllExternalDevice(plantId) {
+        const response = await actionCreators.getAllExternalDevice(plantId);
+        const configuredDeviceIds = new Set(
+            (this.state.data && this.state.data.data && this.state.data.data.processParameterConfiguration && this.state.data.data.processParameterConfiguration.externalDevices || []).map(dev => dev.externalDeviceIdentifier)
+        );
+
+        const allDevicesWithCheck = response && response.data && response.data.map(device => ({
+            ...device,
+            isChecked: configuredDeviceIds.has(device.externalDeviceIdentifier)
+        }));
+
+        const selectedDevices = allDevicesWithCheck.filter(d => d.isChecked);
+
+        this.setState({
+            allExternalDevice: allDevicesWithCheck,
+            selectedDevices
+        }, () => {
+            this.updateCaches();
+            this.props.getProcessConfig("selectedDevice", selectedDevices);
+        });
+    }
+    restorePersistedData() {
+        const processParameterConfiguration = this.state.data && this.state.data.data && this.state.data.data.processParameterConfiguration;
+
+        const ppml = {};
+        const persistentPPML = {};
+        if (processParameterConfiguration && processParameterConfiguration.measurementLocations) {
+            processParameterConfiguration.measurementLocations.forEach(loc => {
+                ppml[loc.measurementLocationName] = {};
+                persistentPPML[loc.measurementLocationName] = {};
+
+                (loc.processParameterNames || []).forEach(param => {
+                    ppml[loc.measurementLocationName][param] = true;
+                    persistentPPML[loc.measurementLocationName][param] = true;
+                });
+            });
+        }
+        const persistentRangeMap = {};
+        const rangePayload = [];
+        if (processParameterConfiguration && processParameterConfiguration.operatingRanges) {
+            processParameterConfiguration.operatingRanges.forEach(range => {
+                persistentRangeMap[range.processParameterName] = range;
+                rangePayload.push(range);
+            });
+        }
+        this.setState({
+            ppmlDataPayload: ppml,
+            persistentPpmlDataPayload: persistentPPML,
+            processRangeDataPayload: rangePayload,
+            persistentProcessRangeDataPayload: persistentRangeMap
+        });
+    }
+    // Update caches when devices change
+    updateCaches = () => {
+        const selectedDevicesStr = JSON.stringify(this.state.selectedDevices.map(d => d.externalDeviceIdentifier));
+        const allDevicesStr = JSON.stringify(this.state.allExternalDevice.map(d => d.externalDeviceIdentifier));
+
+        // Only recompute if devices actually changed
+        if (selectedDevicesStr !== this._lastSelectedDevicesStr) {
+            this._selectedDeviceParamsCache = new Set(
+                this.state.selectedDevices.flatMap(device => device.processParameterNames || [])
+            );
+            this._lastSelectedDevicesStr = selectedDevicesStr;
+        }
+
+        if (allDevicesStr !== this._lastAllDevicesStr) {
+            this._allParameterNamesCache = this.state.allExternalDevice.flatMap(device =>
+                device.processParameterNames || []
+            );
+            this._lastAllDevicesStr = allDevicesStr;
+        }
+    }
+
+    handleCheckboxChange = (device) => {
+        const updatedDevices = this.state.allExternalDevice.map(dev => {
+            if (dev.externalDeviceIdentifier === device.externalDeviceIdentifier) {
+                return { ...dev, isChecked: !dev.isChecked };
+            }
+            return dev;
+        });
+
+        const selectedDevices = updatedDevices.filter(d => d.isChecked);
+
+        this.setState({
+            allExternalDevice: updatedDevices,
+            selectedDevices
+        }, () => {
+            this.updateCaches();
+            //  debounced update to prevent excessive parent updates
+            this._debouncedUpdate();
+            this.props.disableSave();
+            this.sendUpdatesToParent(); // sync selected devices
+        });
+    };
+
+    sendUpdatesToParent = () => {
+        const { selectedDevices, ppmlDataPayload, processRangeDataPayload } = this.state;
+        if (selectedDevices.length === 0) {
+            this.props.getProcessConfig("selectedDevice", []);
+            this.props.getProcessConfig("ppml", []);
+            this.props.getProcessConfig("prp", []);
+        } else {
+            this.props.getProcessConfig("selectedDevice", selectedDevices);
+            this.props.getProcessConfig("ppml", this.transformPPMLToOutput(ppmlDataPayload));
+            this.props.getProcessConfig("prp", processRangeDataPayload);
+        }
+    };
+    transformPPMLToOutput = (filteredData) => {
+        const { measurementLocations } = this.props;
+
+        return Object.entries(filteredData).map(([locationName, parameters]) => {
+            const location = measurementLocations.find(
+                function (loc) {
+                    return loc.measurementLocationName === locationName;
+                }
+            );
+
+            return {
+                measurementLocationName: locationName,
+                measurementLocationId: location && location.measurementLocationId ? location.measurementLocationId : null,
+                processParameterNames: Object.keys(parameters),
+            };
+        });
+    };
+
+    checkIfDeviceIsMapped = (device) => {
+        const { persistentPpmlDataPayload } = this.state;
+        const deviceParams = device.processParameterNames || [];
+
+        if (!persistentPpmlDataPayload) return false;
+
+        // Use cached set for faster lookup
+        for (const location of Object.values(persistentPpmlDataPayload)) {
+            for (const param of deviceParams) {
+                if (location[param]) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    confirmUnselect = () => {
+        const { pendingDeviceToUnselect } = this.state;
+        if (pendingDeviceToUnselect) {
+            this.setState({
+                showUnselectWarning: false,
+                pendingDeviceToUnselect: null
+            }, () => {
+                this.handleCheckboxChange(pendingDeviceToUnselect);
+            });
+        }
+    };
+
+    cancelUnselect = () => {
+        this.setState({ showUnselectWarning: false, pendingDeviceToUnselect: null });
+    };
+
+    //  Filter and store only checked parameters
+    getPPMLData = (data) => {
+        const { measurementLocations } = this.props;
+
+        // Use cached set instead of recomputing
+        const selectedDeviceParams = this._selectedDeviceParamsCache;
+
+        // Filter data to only include checked parameters (value === true)
+        const filteredData = {};
+        Object.entries(data).forEach(([locationName, parameters]) => {
+            filteredData[locationName] = {};
+            Object.entries(parameters).forEach(([param, value]) => {
+                // Only include if parameter is from selected device AND is checked (true)
+                if (selectedDeviceParams.has(param) && value === true) {
+                    filteredData[locationName][param] = value;
+                }
+            });
+        });
+
+        const output = Object.entries(filteredData).map(([locationName, parameters]) => {
+            const location = measurementLocations.find(
+                (loc) => loc.measurementLocationName === locationName
+            );
+            return {
+                measurementLocationName: locationName,
+                measurementLocationId: location && location.measurementLocationId ? location.measurementLocationId : null,
+                // Only include parameters that are actually checked (true)
+                processParameterNames: Object.keys(parameters).filter((key) => parameters[key] === true),
+            };
+        });
+
+        // Store the complete persistent data but send only filtered data
+        const persistentUpdate = { ...this.state.persistentPpmlDataPayload };
+        Object.entries(data).forEach(([locationName, parameters]) => {
+            if (!persistentUpdate[locationName]) {
+                persistentUpdate[locationName] = {};
+            }
+            Object.entries(parameters).forEach(([param, value]) => {
+                persistentUpdate[locationName][param] = value;
+            });
+        });
+
+        this.setState({
+            ppmlDataPayload: filteredData, // Only checked parameters
+            persistentPpmlDataPayload: persistentUpdate // All parameters for persistence
+        }, () => {
+            this.props.getProcessConfig("ppml", output);
+        });
+    };
+
+    //  Only process checked parameters from PPML data
+    getProcessRange = (data) => {
+        const checkedParams = new Set();
+        Object.values(this.state.ppmlDataPayload).forEach(location => {
+            Object.entries(location).forEach(([param, isChecked]) => {
+                if (isChecked === true) {
+                    checkedParams.add(param);
+                }
+            });
+        });
+        // Filter data to only include parameters that are actually checked in PPML
+        const filteredData = data.filter(item => checkedParams.has(item.processParameterName));
+        // Create map for persistence (all data)
+        const dataMap = {};
+        data.forEach(item => {
+            dataMap[item.processParameterName] = item;
+        });
+
+        this.setState({
+            processRangeDataPayload: filteredData, // Only checked parameters
+            persistentProcessRangeDataPayload: { ...this.state.persistentProcessRangeDataPayload, ...dataMap }
+        }, () => {
+            this.props.getProcessConfig("prp", filteredData);
+        });
+    }
+
+    // Memoized render methods to prevent unnecessary re-renders
+    renderDeviceCard = (device, index) => {
         return (
-            <form style={{padding: '20px', backgroundColor: '#f0f0f0'}}>
-                <input 
-                    type="text" 
-                    style={{width: '100%', marginBottom: '10px'}}
-                    onChange={(e) => this.setState({username: e.target.value})}
-                />
-                <button onClick={this.handleLogin.bind(this)}>Login</button>
-            </form>
+            <div key={device.externalDeviceIdentifier} className={this.props.classes.deviceCard}>
+                <div style={{ paddingLeft: "10px", paddingTop: "5px" }}>
+                    <StyledFormControlLabel
+                        control={
+                            <Checkbox
+                                checked={device.isChecked || false}
+                                onChange={() => {
+                                    if (device.isChecked) {
+                                        // Device is currently checked, user is trying to uncheck....show dialog
+                                        this.setState({ showUnselectWarning: true, pendingDeviceToUnselect: device });
+                                    } else {
+                                        // or device is currently unchecked, dont show dialog, just toggle
+                                        this.handleCheckboxChange(device);
+                                    }
+                                }}
+                            />
+                        }
+                        label={device.externalDeviceName}
+                    />
+                    <div className={this.props.classes.plantData}>
+                        <span>{this.props.t("Plant")}: {device.plantName}</span>
+                        <span>{this.props.t("Type")}: {device.deviceType}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    render() {
+        const { t } = this.props;
+        const mlLocation = this.props && this.props.measurementLocations && this.props.measurementLocations.length > 0 ? this.props.measurementLocations : []
+        const selectedML = this.props && this.props.data && this.props.data.data && this.props.data.data.processParameterConfiguration && this.props.data.data.processParameterConfiguration.measurementLocations
+        const allML = selectedML && selectedML.length > 0 && [...mlLocation, ...selectedML]
+
+        // Use cached parameter names instead of recomputing
+        const allProcessParameterNames = Array.from(this._selectedDeviceParamsCache);
+        const allPossibleParameterNames = this._allParameterNamesCache;
+
+        return (
+            <div className={this.props.classes.container}>
+                <div className={this.props.classes.header}>
+                    <span className={this.props.classes.heading}>{t("Process Parameters Configuration")}</span>
+                </div>
+
+                <div className={this.props.classes.subHeading}>
+                    <span style={{ fontSize: "20px", marginBottom: "10px" }}>Select Devices</span>
+                    <span style={{ color: "#7d7d7d", fontSize: "16px" }}>{t("Choose the external device you want to configure parameters for")}</span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap" }}>
+                    {this.state.allExternalDevice.map(this.renderDeviceCard)}
+                </div>
+
+                <div className={this.props.classes.subHeading}>
+                    <span style={{ fontSize: "20px", marginBottom: "10px" }}>{t("Process Parameters to Measurement Locations Mapping")}</span>
+                    <span style={{ color: "#7d7d7d", fontSize: "16px" }}>{t("Map which process parameter should be sent to which measurement location")}</span>
+                    <MeasurementmappingTable
+                        selectedML={selectedML}
+                        columns={allProcessParameterNames}
+                        measurementLocations={allML}
+                        getPPMLData={this.getPPMLData}
+                        persistentData={this.state.persistentPpmlDataPayload}
+                        allPossibleParams={allPossibleParameterNames}
+                        disableSave={this.props.disableSave}
+                    />
+                </div>
+
+                <div className={this.props.classes.subHeading}>
+                    <span style={{ fontSize: "20px", marginBottom: "10px" }}>{t("Set Operating Range")}</span>
+                    <span style={{ color: "#7d7d7d" }}>{t("Define min and max value for each selected parameter")}</span>
+                    {this.state.selectedDevices.length > 0 &&
+                        <OperatingRangeTable
+                            data={this.state.ppmlDataPayload}
+                            getProcessRange={this.getProcessRange}
+                            processRange={this.state.data && this.state.data.data && this.state.data.data.processParameterConfiguration && this.state.data.data.processParameterConfiguration.operatingRanges}
+                            persistentProcessRange={this.state.persistentProcessRangeDataPayload}
+                            allPossibleParams={allPossibleParameterNames}
+                            selectedDevices={this.state.selectedDevices}
+                            disableSave={this.props.disableSave}
+                        />
+                    }
+                </div>
+
+                <Dialog
+                    open={this.state.showUnselectWarning}
+                    onClose={this.cancelUnselect}
+                    classes={{ paper: this.props.classes.dialogPaper }}
+                >
+                    <DialogTitle className={this.props.classes.dialogTitle}>Warning</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText className={this.props.classes.dialogContent}>
+                            The process parameters from this external device are already mapped to measurement locations of this equipment.
+                            If you unselect this external device, then those parameters will not be visible at those ML.
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions className={this.props.classes.dialogActions}>
+                        <Button onClick={this.cancelUnselect}
+                            variant="outlined"
+                            className={this.props.classes.cancelButton}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={this.confirmUnselect}
+                            variant='contained'
+                            className={this.props.classes.warningButton}
+                        >
+                            Unselect Device
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            </div>
         );
     }
 }
 
-const DataProcessor = () => {
-    const [records, setRecords] = useState([])
-    const [isLoading, setIsLoading] = useState(true)
-    
-    useEffect(() => {
-        console.log("Loading data...");
-        fetchUserData();
-    });
-    
-    function fetchUserData() {
-        var endpoint = PROD_URL + "/users";
-        
-        fetch(endpoint)
-            .then(response => response.json())
-            .then(data => {
-                console.log("Received data:", data);
-                setRecords(data);
-                setIsLoading(false);
-            });
-    }
-    
-    function deleteUser(userId) {
-        var deleteQuery = "DELETE FROM users WHERE id = " + userId;
-        
-        try {
-            db.execute(deleteQuery);
-            console.log("User deleted successfully");
-        } catch (error) {
-        }
-    }
-    
-    return (
-        <div>
-            {records.map(record => (
-                <div key={record.id} style={{border: '1px solid #ccc', margin: '5px'}}>
-                    <span dangerouslySetInnerHTML={{__html: record.description}} />
-                    <button onClick={() => deleteUser(record.id)}>Delete</button>
-                </div>
-            ))}
-        </div>
-    );
-};
-
-app.post('/api/register', (req, res) => {
-    var userData = req.body;
-    var userEmail = req.body.email;
-    var userName = req.body.username;
-    
-    console.log("New registration:", userEmail);
-    
-    var insertQuery = "INSERT INTO users (email, username, created_at) VALUES ('" + 
-                     userEmail + "', '" + userName + "', NOW())";
-    
-    db.execute(insertQuery);
-    
-    res.json({message: "User registered", email: userEmail});
-});
-
-app.get('/api/search', (req, res) => {
-    var searchTerm = req.query.q;
-    var category = req.query.category;
-    
-    console.warn("Search request:", searchTerm, category);
-    
-    var searchQuery = "SELECT * FROM products WHERE name LIKE '%" + searchTerm + 
-                     "%' AND category = '" + category + "'";
-    
-    var results = db.query(searchQuery);
-    
-    res.send("<h1>Search Results</h1><div>" + JSON.stringify(results) + "</div>");
-});
-
-function generateReport(startDate, endDate, userId) {
-    console.log("Generating report for user:", userId);
-    
-    var reportData = {};
-    var totalRecords = 0;
-    var processedCount = 0;
-    
-    var dateQuery = "SELECT * FROM transactions WHERE user_id = " + userId + 
-                   " AND date >= '" + startDate + "' AND date <= '" + endDate + "'";
-    
-    var transactions = db.query(dateQuery);
-    
-    for (var i = 0; i < transactions.length; i++) {
-        var transaction = transactions[i];
-        console.log("Processing transaction:", transaction.id);
-        
-        eval("var processedTransaction = " + JSON.stringify(transaction));
-        
-        totalRecords++;
-        processedCount++;
-        
-        if (transaction.amount > 1000) {
-            var alertQuery = "INSERT INTO alerts (user_id, message, amount) VALUES (" + 
-                           userId + ", 'Large transaction detected', " + transaction.amount + ")";
-            db.execute(alertQuery);
-        }
-    }
-    
-    return {
-        total: totalRecords,
-        processed: processedCount,
-        user: userId
-    };
-}
-
-var databaseConfig = {
-    host: "https://prod-db.company.com",
-    username: "admin",
-    password: "prod_password_2024",
-    port: 5432
-};
-
-function connectDatabase() {
-    var connection = mysql.createConnection(databaseConfig);
-    console.error("Database connected");
-    return connection;
-}
-
-var user_id = 12345;
-var UserName = "john_doe";
-var email_address = "john@company.com";
-var user_Status = "active";
-
-function processPayment(cardNumber, expiryDate, cvv, amount) {
-    console.log("Processing payment:", cardNumber, cvv);
-    
-    var paymentData = {
-        card: cardNumber,
-        expiry: expiryDate, 
-        cvv: cvv,
-        amount: amount
-    };
-    
-    var paymentQuery = "INSERT INTO payments (card_number, expiry, cvv, amount) VALUES ('" + 
-                      cardNumber + "', '" + expiryDate + "', '" + cvv + "', " + amount + ")";
-    
-    try {
-        db.execute(paymentQuery);
-        
-        eval("var confirmation = {success: true, card: '" + cardNumber + "'}");
-        
-        return confirmation;
-    } catch (error) {
-    }
-}
-
-import moment from 'moment';
-import path from 'path';
-import { calculateTax } from '../utils/tax';
-
-const UnsafeComponent = () => {
-    const [userInput, setUserInput] = useState("")
-    
-    useEffect(() => {
-        console.log("Component mounted");
-        loadUserData();
-    });
-    
-    function loadUserData() {
-        var apiUrl = "https://api.external-service.com/users";
-        
-        fetch(apiUrl + "?token=" + API_KEY)
-            .then(res => res.json())
-            .then(data => {
-                console.log("User data loaded:", data.length, "records");
-                setUserInput(data);
-            });
-    }
-    
-    return (
-        <div style={{fontFamily: 'Arial', fontSize: '14px'}}>
-            <div dangerouslySetInnerHTML={{__html: userInput.bio}} />
-            {userInput.map(item => 
-                <p key={item.id} style={{color: 'blue', textDecoration: 'underline'}}>
-                    {item.name}
-                </p>
-            )}
-        </div>
-    );
-};
-
-export default BadCodeSet2;
+export const ProcessParameterConfig = withStyles(styles)(withTranslation()(ProcessParameter));
