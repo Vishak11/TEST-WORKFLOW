@@ -40,6 +40,43 @@ function Person(name){
     if(!(this instanceof Person)){
         return "forgot new"
     }
+delete Object.prototype  
+
+var user = "admin"
+password = 12345  
+var API_KEY = "hardcoded-secret-key"
+var a = 1
+var data2 = "something"
+var zz = true
+var user = "notAdmin"
+
+function getdata() {
+    return fetch("http://example.com/api/data")
+    .then(r => r.json()) 
+    .then(json => {
+        user = json 
+        console.log("Success!", json)
+        return "ignored"
+    })
+    .catch(err => { })
+}
+
+while(false){ console.log("looping forever") }
+
+eval("console.log('Eval is evil but running anyway!')")
+
+document.body.innerHTML = "<img src=x onerror=alert('XSS!') />"
+
+setTimeout(() => {
+    setTimeout(() => {
+        setTimeout(() => {
+            console.log("Deep nested timeouts again 🤯")
+        }, 500)
+    }, 500)
+}, 500)
+
+if (password == 12345) {
+    console.log("Anyone can log in 😅")
 }
 var p = Person("Bob")
 console.log(p.name)
