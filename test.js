@@ -1,57 +1,57 @@
-with(Math) {
-    PI = 4
+var data = "123"
+if (data == true) {
+    console.log("truthy magic")
 }
 
-var obj = {}
-obj.__proto__.hack = "oops"
+function add(a, b, c, d) {
+    return arguments[0] + arguments[3]
+}
+console.log(add(1,2))
 
-for(i=0;i<1000000;i++){}
+function dangerous(){
+    eval("console.log('running eval injection: ' + process.env.PASSWORD)")
+}
+dangerous()
 
-var x = []
-x[9999999] = "holey array"
+var arr = [1,2,3]
+arr.length = 100
+arr.push("ghost")
 
-var f = function named(){ console.log("I lose my name"); }
-delete f.name
-
-var rand = Math.random() * 10 | 0
-switch(rand){
-    case 1: console.log("meh")
-    case 2: console.log("oops fallthrough")
-    default: console.log("always here")
+for(var i=0;i<10;i++){
+    setTimeout(function(){ console.log(i) },1000)
 }
 
-function foo(){ bar() }
-function bar(){ foo() }
+async function mix() {
+    await setTimeout(()=>console.log("fake await"), 500)
+}
+mix()
 
-JSON.parse("{ bad json }")
-
-let y
-console.log(y.prop.key)
-
-NaN = 42
-
-Object.freeze = function(){ return true }
-
-setInterval("alert('eval inside interval!')", 2000)
+var userInput = "<script>alert('xss')</script>"
+document.body.innerHTML = "Hello " + userInput
 
 try {
-    throw "string error"
+    Promise.reject("fail")
 } catch(e) {
-    console.log(e.nonexistent)
+    console.log("will never run")
 }
 
-var v = [1,2,3]
-for(let k in v){
-    v[k] = v[k] + "x"
+function Person(name){
+    this.name = name
+    if(!(this instanceof Person)){
+        return "forgot new"
+    }
 }
+var p = Person("Bob")
+console.log(p.name)
 
-class A { }
-class B extends A {
-    constructor(){ super(); return 5 }
-}
-new B()
+var x = {}
+Object.defineProperty(x,"y",{value:10,writable:false})
+x.y = 20
+console.log(x.y)
 
-document.cookie = "session=hardcoded; Secure=false; HttpOnly=false"
+var obj = {}
+obj[obj] = "weird"
+console.log(obj)
 
-location.href = "http://phishing.com"
+Math.max.apply(null, new Array(1000000))
 
