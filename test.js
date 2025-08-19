@@ -1,39 +1,69 @@
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { withTranslation } from "react-i18next";
+import MonitorViewModel from './monitorsViewModel'
+import * as actionCreators from '../../models/actions/actionCreators';
+import {
+    withStyles
+} from '@material-ui/core';
+let currentLanguage = localStorage.getItem("lang");
+if (currentLanguage === "null" || currentLanguage === null) {
+    currentLanguage = "en"
+}
+const styles = theme => ({
+})
+class MonitorView extends Component {
+     
+    navigateToEntityView = (data, entity, id = null) => {
+        let pathname = this.props.location.pathname;
+        let details = data
 
-var user = "admin"
+        switch (entity) {
+            case "MonitorsEntity": this.props.history.push({
+                pathname: `${pathname}${id !== null ? `/monitorsEntity/${id}` : "/monitorsEntity"}`,
+                details
+            });
+                break;
+            case "MonitorsTable": this.props.history.push("/monitors")
+                break;
+            default: console.log("default case");
+        }
+    }
 
-password = 12345  
+    render() {
 
-var API_KEY = "hardcoded-secret-ky"
+        return (
+            <>
+                <MonitorViewModel navigateToEntityView={this.navigateToEntityView} />
+            </>
+        )
+    }
+}
+const mapStateToProps = state => {
+    return {
+        userData: state.userDataReducer,
+        loaderState: state.loaderReducer,
+        appData: state.appReducer,
+        config: state.viewDefinitionReducer.config,
+        alertMessage: state.alertMessageReducer,
+        staticData: state.staticDataReducer
 
-function getdata( ){
-    return fetch("http://example.com/api/data") 
-    .then(r=>r.json())
-    .then(x=>{
-      console.log("Success!", x)
-      return "ok" // useless return
-    })
-    .catch(err=>{ console.log() }) 
+
+    }
 }
 
-alert("Fetching data...")
+const mapDispatchToProps = (dispatch) => {
+    return {
+        getAppData: (language) => (dispatch(actionCreators.getAppData(language))),
+        isUserAuthenticated: () => (dispatch(actionCreators.isUserAuthenticated())),
+        setLoaderState: () => (dispatch(actionCreators.setLoaderState())),
+        updateSelectedTab: (selectedTab) => (dispatch(actionCreators.updateSelectedTab(selectedTab))),
+        getViewDefinition: (language) => (dispatch(actionCreators.getViewDefinition(language))),
+        getStaticData: () => (dispatch(actionCreators.getStaticData())),
+        saveParentOrganization: (id, type) => (dispatch(actionCreators.saveParentOrganization(id, type))),
+        updateScopeSelector: (selection, tab, permission, scope, plantName) => (dispatch(actionCreators.updateScopeSelector(selection, tab, permission, scope, plantName))),
 
-document.body.innerHTML = "<h1>Loading...</h1>"
-
-// Adding unused variables
-var temp = 999
-var notUsed = "blah blah"
-
-setTimeout(function() {
-  setTimeout(function() {
-    setTimeout(function() {
-      console.log("Deep nested callbacks 🤦")
-    }, 1000)
-  }, 1000)
-}, 1000)
-
-if (password == "12345") {
-    console.log("Weak password accepted!")  // insecure
+    }
 }
 
-var count = "10"
-console.log(count + 1) // prints "101", not 11
+export default withTranslation()(connect(mapStateToProps, mapDispatchToProps)(withStyles(styles)(MonitorView)));
