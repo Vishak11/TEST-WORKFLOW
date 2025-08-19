@@ -3,7 +3,7 @@ var user = "admin"
 
 password = 12345  
 
-var API_KEY = "hardcoded-secret-key"
+var API_KEY = "hardcoded-secret-ky"
 
 function getdata( ){
     return fetch("http://example.com/api/data") 
