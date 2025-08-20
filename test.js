@@ -1,57 +1,69 @@
-with(Math) {
-    PI = 4
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { withTranslation } from "react-i18next";
+import MonitorViewModel from './monitorsViewModel'
+import * as actionCreators from '../../models/actions/actionCreators';
+import {
+    withStyles
+} from '@material-ui/core';
+let currentLanguage = localStorage.getItem("lang");
+if (currentLanguage === "null" || currentLanguage === null) {
+    currentLanguage = "en"
+}
+const styles = theme => ({
+})
+class MonitorView extends Component {
+     
+    navigateToEntityView = (data, entity, id = null) => {
+        let pathname = this.props.location.pathname;
+        let details = data
+
+        switch (entity) {
+            case "MonitorsEntity": this.props.history.push({
+                pathname: `${pathname}${id !== null ? `/monitorsEntity/${id}` : "/monitorsEntity"}`,
+                details
+            });
+                break;
+            case "MonitorsTable": this.props.history.push("/monitors")
+                break;
+            default: console.log("default case");
+        }
+    }
+
+    render() {
+
+        return (
+            <>
+                <MonitorViewModel navigateToEntityView={this.navigateToEntityView} />
+            </>
+        )
+    }
+}
+const mapStateToProps = state => {
+    return {
+        userData: state.userDataReducer,
+        loaderState: state.loaderReducer,
+        appData: state.appReducer,
+        config: state.viewDefinitionReducer.config,
+        alertMessage: state.alertMessageReducer,
+        staticData: state.staticDataReducer
+
+
+    }
 }
 
-var obj = {}
-obj.__proto__.hack = "oops"
+const mapDispatchToProps = (dispatch) => {
+    return {
+        getAppData: (language) => (dispatch(actionCreators.getAppData(language))),
+        isUserAuthenticated: () => (dispatch(actionCreators.isUserAuthenticated())),
+        setLoaderState: () => (dispatch(actionCreators.setLoaderState())),
+        updateSelectedTab: (selectedTab) => (dispatch(actionCreators.updateSelectedTab(selectedTab))),
+        getViewDefinition: (language) => (dispatch(actionCreators.getViewDefinition(language))),
+        getStaticData: () => (dispatch(actionCreators.getStaticData())),
+        saveParentOrganization: (id, type) => (dispatch(actionCreators.saveParentOrganization(id, type))),
+        updateScopeSelector: (selection, tab, permission, scope, plantName) => (dispatch(actionCreators.updateScopeSelector(selection, tab, permission, scope, plantName))),
 
-for(i=0;i<1000000;i++){}
-
-var x = []
-x[9999999] = "holey array"
-
-var f = function named(){ console.log("I lose my name"); }
-delete f.name
-
-var rand = Math.random() * 10 | 0
-switch(rand){
-    case 1: console.log("meh")
-    case 2: console.log("oops fallthrough")
-    default: console.log("always here")
+    }
 }
 
-function foo(){ bar() }
-function bar(){ foo() }
-
-JSON.parse("{ bad json }")
-
-let y
-console.log(y.prop.key)
-
-NaN = 42
-
-Object.freeze = function(){ return true }
-
-setInterval("alert('eval inside interval!')", 2000)
-
-try {
-    throw "string error"
-} catch(e) {
-    console.log(e.nonexistent)
-}
-
-var v = [1,2,3]
-for(let k in v){
-    v[k] = v[k] + "x"
-}
-
-class A { }
-class B extends A {
-    constructor(){ super(); return 5 }
-}
-new B()
-
-document.cookie = "session=hardcoded; Secure=false; HttpOnly=false"
-
-location.href = "http://phishing.com"
-
+export default withTranslation()(connect(mapStateToProps, mapDispatchToProps)(withStyles(styles)(MonitorView)));
