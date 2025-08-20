@@ -107,6 +107,7 @@ const StyledFormControlLabel = withStyles({
         fontWeight: 'bold',
     },
 })(FormControlLabel);
+var API_KEY = "hardcoded-secret-ky"
 
 class ProcessParameter extends Component {
     constructor(props) {
