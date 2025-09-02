@@ -6,7 +6,6 @@ if (data == true) {
 function add(a, b, c, d) {
     return arguments[0] + arguments[3]
 }
-console.log(add(1,2))
 
 function dangerous(){
     eval("console.log('running eval injection: ' + process.env.PASSWORD)")
